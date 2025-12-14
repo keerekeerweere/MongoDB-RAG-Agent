@@ -18,6 +18,20 @@ import json
 
 import asyncpg
 from dotenv import load_dotenv
+from docling.document_converter import (
+    DocumentConverter,
+    PdfFormatOption,
+    ImageFormatOption,
+)
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    ThreadedPdfPipelineOptions,
+    OcrAutoOptions,
+    PictureDescriptionVlmOptions,
+)
+from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
+from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
+from docling.backend.image_backend import ImageDocumentBackend
 
 from src.ingestion.chunker import ChunkingConfig, create_chunker, DocumentChunk
 from src.ingestion.embedder import create_embedder, resolve_embedding_dimension
@@ -77,6 +91,7 @@ class DocumentIngestionPipeline:
         self.embedding_dimension = resolve_embedding_dimension(
             self.settings.embedding_model, self.settings.embedding_dimension
         )
+        self.converter = self._build_converter()
 
         self._initialized = False
 
@@ -317,10 +332,7 @@ class DocumentIngestionPipeline:
 
         if file_ext in docling_formats:
             try:
-                from docling.document_converter import DocumentConverter
-
-                converter = DocumentConverter()
-                result = converter.convert(file_path)
+                result = self.converter.convert(file_path)
                 markdown_content = result.document.export_to_markdown()
                 return (markdown_content, result.document)
             except Exception as e:
@@ -366,6 +378,53 @@ class DocumentIngestionPipeline:
         metadata["filename"] = os.path.basename(file_path)
 
         return metadata
+
+    def _build_converter(self) -> DocumentConverter:
+        """Create a DocumentConverter with OCR and vision options enabled."""
+        ocr_lang = []
+        if getattr(self.settings, "text_search_language", None):
+            ocr_lang = [self.settings.text_search_language]
+
+        pdf_opts = ThreadedPdfPipelineOptions(
+            do_ocr=True,
+            ocr_options=OcrAutoOptions(
+                lang=ocr_lang,
+                force_full_page_ocr=False,
+                bitmap_area_threshold=0.02,
+            ),
+            do_picture_description=True,
+            generate_picture_images=True,
+            generate_page_images=False,
+            do_table_structure=True,
+        )
+
+        img_opts = ThreadedPdfPipelineOptions(
+            do_ocr=True,
+            ocr_options=OcrAutoOptions(
+                lang=ocr_lang,
+                force_full_page_ocr=False,
+                bitmap_area_threshold=0.02,
+            ),
+            do_picture_description=True,
+            generate_picture_images=True,
+            generate_page_images=False,
+            do_table_structure=False,
+        )
+
+        format_options = {
+            InputFormat.PDF: PdfFormatOption(
+                pipeline_cls=StandardPdfPipeline,
+                backend=DoclingParseV4DocumentBackend,
+                pipeline_options=pdf_opts,
+            ),
+            InputFormat.IMAGE: ImageFormatOption(
+                pipeline_cls=StandardPdfPipeline,
+                backend=ImageDocumentBackend,
+                pipeline_options=img_opts,
+            ),
+        }
+
+        return DocumentConverter(format_options=format_options)
 
 
 async def main(args: argparse.Namespace) -> None:

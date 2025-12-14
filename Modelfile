@@ -1,5 +1,0 @@
-# Use the gpt-oss model as the base
-FROM gpt-oss:120b
-
-# Offload 30 layers to the GPU
-PARAMETER num_gpu 21
