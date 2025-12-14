@@ -1,24 +1,28 @@
 # PostgreSQL RAG Agent - Intelligent Knowledge Base Search
 
-Agentic RAG system combining PostgreSQL PGVector with Pydantic AI for intelligent document retrieval.
+Agentic RAG system combining PostgreSQL + pgvector with Pydantic AI for intelligent document retrieval.
 
 ## Features
 
-- **Hybrid Search**: Combines semantic vector search with full-text keyword search using Reciprocal Rank Fusion (RRF)
-  - Manual RRF implementation provides same quality as MongoDB's `$rankFusion` (which is in preview)
-  - Concurrent execution for minimal latency overhead
+- **Hybrid Search**: Combines semantic vector search with full-text keyword search using a weighted blend
+  - Vector similarity via pgvector, text relevance via `tsvector`
 - **Multi-Format Ingestion**: PDF, Word, PowerPoint, Excel, HTML, Markdown, Audio transcription
 - **Intelligent Chunking**: Docling HybridChunker preserves document structure and semantic boundaries
 - **Conversational CLI**: Rich-based interface with real-time streaming and tool call visibility
 - **Multiple LLM Support**: OpenAI, OpenRouter, Ollama, Gemini
-- **Cost Effective**: Runs entirely on MongoDB Atlas free tier (M0)
+- **Runs Locally**: Works with your local Postgres + pgvector (no Atlas required)
+- **Multi-Format Ingestion**: PDF, Word, PowerPoint, Excel, HTML, Markdown, Audio transcription
+- **Intelligent Chunking**: Docling HybridChunker preserves document structure and semantic boundaries
+- **Conversational CLI**: Rich-based interface with real-time streaming and tool call visibility
+- **Multiple LLM Support**: OpenAI, OpenRouter, Ollama, Gemini
+- **Cost Effective**: Runs locally with Postgres; no cloud dependency
 
 ## Prerequisites
 
 - Python 3.10+
-- PostgreSQL PgVector  account or local setup 
-- LLM provider API key (OpenAI, OpenRouter, Ollama (openai api) etc.)
-- Embedding provider API key (OpenAI or OpenRouter recommended, Ollama (openai api))
+- Local PostgreSQL with pgvector (Docker is fine)
+- LLM provider API key (OpenAI, OpenRouter, Ollama via OpenAI API, etc.)
+- Embedding provider API key (OpenAI or OpenRouter recommended)
 - UV package manager
 
 ## Quick Start
@@ -46,18 +50,25 @@ source .venv/bin/activate  # Unix/Mac
 uv sync
 ```
 
-### 3. Set Up PostgreSQL TODO....
+### 3. Start Postgres with pgvector (example docker-compose)
 
-1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) and create a free account
-2. Click **"Create"** → Choose **M0 Free** tier → Select region → Click **"Create Deployment"**
-3. **Quickstart Wizard** appears - configure security:
-   - **Database User**: Create username and password (save these!)
-   - **Network Access**: Click "Add My Current IP Address"
-4. Click **"Connect"** → **"Drivers"** → Copy your connection string
-   - Format: `mongodb+srv://username:<password>@cluster.mongodb.net/?appName=YourApp`
-   - Replace `<password>` with your actual password
+```yaml
+services:
+  db:
+    image: ankane/pgvector
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: ragpass
+      POSTGRES_DB: rag_db
+    ports:
+      - "5432:5432"
+```
 
-**Note**: Database (`rag_db`) and collections (`documents`, `chunks`) will be created automatically when you run ingestion in step 6.
+After the container is up, verify extensions inside psql:
+```
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+```
 
 ### 4. Configure Environment Variables
 
@@ -67,9 +78,10 @@ cp .env.example .env
 ```
 
 Edit `.env` with your credentials:
-- **MONGODB_URI**: Connection string from step 3
+- **DATABASE_URL**: e.g., `postgresql://rag:ragpass@localhost:5432/rag_db`
 - **LLM_API_KEY**: Your LLM provider API key (OpenRouter, OpenAI, etc.)
 - **EMBEDDING_API_KEY**: Your API key for embeddings (such as OpenAI or OpenRouter)
+- **EMBEDDING_MODEL / EMBEDDING_DIMENSION**: Ensure the dimension matches your pgvector column (default 1536)
 
 ### 5. Validate Configuration
 
@@ -90,57 +102,9 @@ This will:
 - Process your documents (PDF, Word, PowerPoint, Excel, Markdown, etc.)
 - Chunk them intelligently
 - Generate embeddings
-- Store everything in MongoDB (`rag_db.documents` and `rag_db.chunks`)
+- Store everything in Postgres (`documents`, `chunks`); vector and FTS indexes are created automatically on first run.
 
-### 7. Create Search Indexes in MongoDB Atlas
-
-**Important**: Only create these indexes AFTER running ingestion - you need data in your `chunks` collection first.
-
-In MongoDB Atlas, go to **Database** → **Search and Vector Search** → **Create Search Index**
-
-**1. Vector Search Index**
-- Pick: **"Vector Search"**
-- Database: `rag_db`
-- Collection: `chunks`
-- Index name: `vector_index`
-- JSON:
-```json
-{
-  "fields": [
-    {
-      "type": "vector",
-      "path": "embedding",
-      "numDimensions": 1536,
-      "similarity": "cosine"
-    }
-  ]
-}
-```
-
-**2. Atlas Search Index**
-- Click **"Create Search Index"** again
-- Pick: **"Atlas Search"**
-- Database: `rag_db`
-- Collection: `chunks`
-- Index name: `text_index`
-- JSON:
-```json
-{
-  "mappings": {
-    "dynamic": false,
-    "fields": {
-      "content": {
-        "type": "string",
-        "analyzer": "lucene.standard"
-      }
-    }
-  }
-}
-```
-
-Wait 1-5 minutes for both indexes to build (status: "Building" → "Active").
-
-### 8. Run the Agent
+### 7. Run the Agent
 
 ```bash
 uv run python -m src.cli
@@ -151,62 +115,42 @@ Now you can ask questions and the agent will search your knowledge base!
 ## Project Structure
 
 ```
-MongoDB-RAG-Agent/
-├── src/                           # MongoDB implementation (COMPLETE)
-│   ├── settings.py               # ✅ Configuration management
-│   ├── providers.py              # ✅ LLM/embedding providers
-│   ├── dependencies.py           # ✅ MongoDB connection & AgentDependencies
-│   ├── test_config.py            # ✅ Configuration validation
-│   ├── tools.py                  # ✅ Search tools (semantic, text, hybrid RRF)
-│   ├── agent.py                  # ✅ Pydantic AI agent with search tools
-│   ├── cli.py                    # ✅ Rich-based conversational CLI
-│   ├── prompts.py                # ✅ System prompts
+PostgreSQL-RAG-Agent/
+├── src/                           # Postgres implementation
+│   ├── settings.py               # Configuration management
+│   ├── providers.py              # LLM/embedding providers
+│   ├── dependencies.py           # Postgres connection & AgentDependencies
+│   ├── test_config.py            # Configuration validation
+│   ├── tools.py                  # Search tools (semantic, text, hybrid)
+│   ├── agent.py                  # Pydantic AI agent with search tools
+│   ├── cli.py                    # Rich-based conversational CLI
+│   ├── prompts.py                # System prompts
 │   └── ingestion/
-│       ├── chunker.py            # ✅ Docling HybridChunker wrapper
-│       ├── embedder.py           # ✅ Batch embedding generation
-│       └── ingest.py             # ✅ MongoDB ingestion pipeline
-├── examples/                      # PostgreSQL reference (DO NOT MODIFY)
-│   ├── agent.py                  # Reference: Pydantic AI agent patterns
-│   ├── tools.py                  # Reference: PostgreSQL search tools
-│   └── cli.py                    # Reference: Rich CLI interface
-├── documents/                     # Document folder (13 sample documents included)
-├── .claude/                       # Project documentation
-│   ├── PRD.md                    # Product requirements
-│   └── reference/                # MongoDB/Docling/Agent patterns
-├── .agents/
-│   ├── plans/                    # Implementation plans (all phases)
-│   └── analysis/                 # Technical analysis & decisions
-├── comprehensive_e2e_test.py      # ✅ Full E2E validation (10/10 passed)
+│       ├── chunker.py            # Docling HybridChunker wrapper
+│       ├── embedder.py           # Batch embedding generation
+│       └── ingest.py             # Postgres ingestion pipeline
+├── examples/                      # Legacy reference
+├── documents/                     # Document folder (sample docs)
+├── .agents/                       # Plans and analysis
 └── pyproject.toml                # UV package configuration
 ```
 
 ## Technology Stack
 
-- **Database**: MongoDB Atlas (Vector Search + Full-Text Search)
+- **Database**: PostgreSQL + pgvector + tsvector
 - **Agent Framework**: Pydantic AI 0.1.0+
 - **Document Processing**: Docling 2.14+ (PDF, Word, PowerPoint, Excel, Audio)
-- **Async Driver**: PyMongo 4.10+ with native async API
+- **Async Driver**: asyncpg
 - **CLI**: Rich 13.9+ (terminal formatting and streaming)
 - **Package Manager**: UV 0.5.0+ (fast dependency management)
 
 ## Hybrid Search Implementation
 
-This project uses **manual Reciprocal Rank Fusion (RRF)** to combine vector and text search results, providing the same quality as MongoDB's `$rankFusion` operator while working on the **free M0 tier** (since $rankFusion is in preview it isn't available on the M0 tier).
+Hybrid search blends pgvector cosine similarity with text ranking (`ts_rank_cd`). Adjust `default_text_weight` in `.env` to tune balance.
 
-### How It Works
+### Reciprocal Rank Fusion (RRF) note
 
-1. **Semantic Search** (`$vectorSearch`): Finds conceptually similar content using vector embeddings
-2. **Text Search** (`$search`): Finds keyword matches with fuzzy matching for typos
-3. **RRF Merging**: Combines results using the formula: `RRF_score = Σ(1 / (60 + rank))`
-   - Documents appearing in both searches get higher combined scores
-   - Automatic deduplication
-   - Standard k=60 constant (proven effective across datasets)
-
-### Performance
-
-- **Latency**: ~350-600ms per query (both searches run concurrently)
-- **Accuracy**: 100% success rate on validation tests
-- **Cost**: $0/month (works on free M0 tier)
+The agent merges vector- and text-ranked results using RRF-style weighting so items that score well in both lists rise to the top. This preserves the strengths of semantic matching while keeping high-signal keyword hits.
 
 ## Usage Examples
 
