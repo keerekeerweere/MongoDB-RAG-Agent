@@ -1,6 +1,6 @@
-# MongoDB RAG Agent - Intelligent Knowledge Base Search
+# PostgreSQL RAG Agent - Intelligent Knowledge Base Search
 
-Agentic RAG system combining MongoDB Atlas Vector Search with Pydantic AI for intelligent document retrieval.
+Agentic RAG system combining PostgreSQL PGVector with Pydantic AI for intelligent document retrieval.
 
 ## Features
 
@@ -16,9 +16,9 @@ Agentic RAG system combining MongoDB Atlas Vector Search with Pydantic AI for in
 ## Prerequisites
 
 - Python 3.10+
-- MongoDB Atlas account (**free M0 tier works perfectly!**)
-- LLM provider API key (OpenAI, OpenRouter, etc.)
-- Embedding provider API key (OpenAI or OpenRouter recommended)
+- PostgreSQL PgVector  account or local setup 
+- LLM provider API key (OpenAI, OpenRouter, Ollama (openai api) etc.)
+- Embedding provider API key (OpenAI or OpenRouter recommended, Ollama (openai api))
 - UV package manager
 
 ## Quick Start
@@ -36,8 +36,8 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ### 2. Clone and Setup Project
 
 ```bash
-git clone https://github.com/coleam00/MongoDB-RAG-Agent.git
-cd MongoDB-RAG-Agent
+git clone https://github.com/coleam00/PostgreSQL-RAG-Agent.git
+cd PostgreSQL-RAG-Agent
 
 # Create virtual environment and install dependencies
 uv venv
@@ -46,7 +46,7 @@ source .venv/bin/activate  # Unix/Mac
 uv sync
 ```
 
-### 3. Set Up MongoDB Atlas
+### 3. Set Up PostgreSQL TODO....
 
 1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) and create a free account
 2. Click **"Create"** → Choose **M0 Free** tier → Select region → Click **"Create Deployment"**
