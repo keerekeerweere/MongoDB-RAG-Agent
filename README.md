@@ -113,6 +113,22 @@ uv run python -m src.cli
 
 Now you can ask questions and the agent will search your knowledge base!
 
+### 8. Optional Web UI (React)
+
+In one terminal (backend):
+```bash
+uv run uvicorn src.web.server:app --reload --port 8000
+```
+
+In another terminal (frontend):
+```bash
+cd webui
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 to use the web interface with prompt selection and feedback buttons.
+
 ## Project Structure
 
 ```

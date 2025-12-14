@@ -1,4 +1,4 @@
-"""Main MongoDB RAG agent implementation with shared state."""
+"""Main PostgreSQL RAG agent implementation with shared state."""
 
 from pydantic_ai import Agent, RunContext
 from pydantic import BaseModel
@@ -8,20 +8,20 @@ from pydantic_ai.ag_ui import StateDeps
 
 from src.providers import get_llm_model
 from src.dependencies import AgentDependencies
-from src.prompts import MAIN_SYSTEM_PROMPT
 from src.tools import semantic_search, hybrid_search, text_search
 
 
 class RAGState(BaseModel):
-    """Minimal shared state for the RAG agent."""
-    pass
+    """Shared state for the RAG agent."""
+
+    last_prompt_id: Optional[str] = None
+    last_search_type: Optional[str] = None
 
 
-# Create the RAG agent with AGUI support
+# Create the RAG agent with AGUI support (system prompt set per run)
 rag_agent = Agent(
     get_llm_model(),
     deps_type=StateDeps[RAGState],
-    system_prompt=MAIN_SYSTEM_PROMPT
 )
 
 
@@ -34,15 +34,6 @@ async def search_knowledge_base(
 ) -> str:
     """
     Search the knowledge base for relevant information.
-
-    Args:
-        ctx: Agent runtime context with state dependencies
-        query: Search query text
-        match_count: Number of results to return (default: 5)
-        search_type: Type of search - "semantic" or "text" or "hybrid" (default: hybrid)
-
-    Returns:
-        String containing the retrieved information formatted for the LLM
     """
     try:
         # Initialize database connection
@@ -75,6 +66,10 @@ async def search_knowledge_base(
                 query=query,
                 match_count=match_count
             )
+
+        # Record last search type for feedback logging
+        if hasattr(ctx, "deps") and hasattr(ctx.deps, "state"):
+            ctx.deps.state.last_search_type = search_type
 
         # Clean up
         await agent_deps.cleanup()

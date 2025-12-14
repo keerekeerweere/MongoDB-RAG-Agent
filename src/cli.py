@@ -7,26 +7,54 @@ from typing import List
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import InMemoryHistory
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import PartDeltaEvent, PartStartEvent, TextPartDelta
 from pydantic_ai.ag_ui import StateDeps
 from dotenv import load_dotenv
+import json
+from datetime import datetime
+from pathlib import Path
+import secrets
+from typing import Optional
 
 # Import our agent and dependencies
 from src.agent import rag_agent, RAGState
 from src.settings import load_settings
+from src.prompts import build_prompt
 
 # Load environment variables
 load_dotenv(override=True)
 
 console = Console()
+session_history = InMemoryHistory()
+session = PromptSession(history=session_history)
+
+
+def record_feedback(query: str, prompt_id: str, search_type: Optional[str], helpful: bool) -> None:
+    """Append feedback to a JSONL log."""
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    log_path = log_dir / "feedback.jsonl"
+    record = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "query": query,
+        "prompt_id": prompt_id,
+        "search_type": search_type,
+        "helpful": helpful,
+    }
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
 
 
 async def stream_agent_interaction(
     user_input: str,
     message_history: List,
-    deps: StateDeps[RAGState]
+    deps: StateDeps[RAGState],
+    prompt_id: str,
+    prompt_text: str
 ) -> tuple[str, List]:
     """
     Stream agent interaction with real-time tool call display.
@@ -40,7 +68,7 @@ async def stream_agent_interaction(
         Tuple of (streamed_text, updated_message_history)
     """
     try:
-        return await _stream_agent(user_input, deps, message_history)
+        return await _stream_agent(user_input, deps, message_history, prompt_id, prompt_text)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         import traceback
@@ -51,7 +79,9 @@ async def stream_agent_interaction(
 async def _stream_agent(
     user_input: str,
     deps: StateDeps[RAGState],
-    message_history: List
+    message_history: List,
+    prompt_id: str,
+    prompt_text: str
 ) -> tuple[str, List]:
     """Stream the agent execution and return response."""
 
@@ -61,7 +91,8 @@ async def _stream_agent(
     async with rag_agent.iter(
         user_input,
         deps=deps,
-        message_history=message_history
+        message_history=message_history,
+        instructions=prompt_text
     ) as run:
 
         async for node in run:
@@ -181,6 +212,9 @@ async def main():
     # Show welcome
     display_welcome()
 
+    # Load settings once (shared)
+    settings = load_settings()
+
     # Create the state that the agent will use
     state = RAGState()
 
@@ -195,8 +229,8 @@ async def main():
     try:
         while True:
             try:
-                # Get user input
-                user_input = Prompt.ask("[bold green]You").strip()
+                # Get user input (async-friendly prompt_toolkit)
+                user_input = (await session.prompt_async("[bold green]You> ")).strip()
 
                 # Handle special commands
                 if user_input.lower() in ['exit', 'quit', 'q']:
@@ -204,14 +238,14 @@ async def main():
                     break
 
                 elif user_input.lower() == 'info':
-                    settings = load_settings()
                     console.print(Panel(
                         f"[cyan]LLM Provider:[/cyan] {settings.llm_provider}\n"
                         f"[cyan]LLM Model:[/cyan] {settings.llm_model}\n"
                         f"[cyan]Embedding Model:[/cyan] {settings.embedding_model}\n"
                         f"[cyan]Embedding Dimension:[/cyan] {settings.embedding_dimension}\n"
                         f"[cyan]Default Match Count:[/cyan] {settings.default_match_count}\n"
-                        f"[cyan]Default Text Weight:[/cyan] {settings.default_text_weight}",
+                        f"[cyan]Default Text Weight:[/cyan] {settings.default_text_weight}\n"
+                        f"[cyan]Text Search Language:[/cyan] {settings.text_search_language}",
                         title="System Configuration",
                         border_style="magenta"
                     ))
@@ -225,11 +259,20 @@ async def main():
                 if not user_input:
                     continue
 
+                # Pick a prompt variant for this turn
+                prompt_id, prompt_text = build_prompt(
+                    prompt_id=None,
+                    language=settings.text_search_language
+                )
+                deps.state.last_prompt_id = prompt_id
+
                 # Stream the interaction and get response
                 response_text, new_messages = await stream_agent_interaction(
                     user_input,
                     message_history,
-                    deps
+                    deps,
+                    prompt_id,
+                    prompt_text
                 )
 
                 # Add new messages to history (includes both user prompt and agent response)
@@ -237,6 +280,16 @@ async def main():
 
                 # Add spacing after response
                 console.print()
+
+                # Ask for feedback
+                feedback = Prompt.ask("[dim]Helpful? (y/n, enter to skip)", default="").strip().lower()
+                if feedback in ("y", "n"):
+                    record_feedback(
+                        query=user_input,
+                        prompt_id=prompt_id,
+                        search_type=deps.state.last_search_type,
+                        helpful=feedback == "y",
+                    )
 
             except KeyboardInterrupt:
                 console.print("\n[yellow]Use 'exit' to quit[/yellow]")

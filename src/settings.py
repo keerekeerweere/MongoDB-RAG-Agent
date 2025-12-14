@@ -72,7 +72,6 @@ class Settings(BaseSettings):
     default_text_weight: float = Field(
         default=0.3, description="Default text weight for hybrid search (0-1)"
     )
-
     text_search_language: str = Field(
         default="english", description="Postgres text search language (e.g., english, dutch)"
     )

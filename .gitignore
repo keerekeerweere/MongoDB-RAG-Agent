@@ -45,3 +45,5 @@ uv.lock
 
 # Logs
 *.log
+webui/node_modules/.bin/**
+webui/node_modules/**
