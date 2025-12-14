@@ -87,6 +87,7 @@ class DocumentIngestionPipeline:
 
         self.chunker = create_chunker(self.chunker_config)
         self.embedder = create_embedder()
+        logger.info(f"using embedder {self.embedder.model}/{self.embedder.config['dimensions'] } ")
 
         self._initialized = False
 

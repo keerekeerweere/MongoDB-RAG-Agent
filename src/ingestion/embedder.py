@@ -74,6 +74,7 @@ class EmbeddingGenerator:
 
         response = await embedding_client.embeddings.create(
             model=self.model,
+            dimensions = 1536,
             input=text
         )
 
@@ -101,6 +102,7 @@ class EmbeddingGenerator:
 
         response = await embedding_client.embeddings.create(
             model=self.model,
+            dimensions=1536,
             input=processed_texts
         )
 

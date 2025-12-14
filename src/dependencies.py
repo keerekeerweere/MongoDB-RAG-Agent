@@ -98,7 +98,7 @@ class AgentDependencies:
             await self.initialize()
 
         response = await self.openai_client.embeddings.create(
-            model=self.settings.embedding_model, input=text
+            model=self.settings.embedding_model, dimensions=1536,input=text
         )
         # Return as list of floats - MongoDB stores as native array
         return response.data[0].embedding
