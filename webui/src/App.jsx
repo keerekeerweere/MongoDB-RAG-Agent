@@ -1,15 +1,26 @@
 import { useEffect, useState, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const API_BASE = "http://localhost:8000";
 
 function MessageBubble({ role, text, meta, onFeedback }) {
   return (
     <div className={`bubble ${role}`}>
-      <div>{text}</div>
+      <div className="message-body">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
       {meta && (
         <div className="meta">
           {meta.prompt_id ? `Prompt: ${meta.prompt_id}` : ""}{" "}
           {meta.search_type ? `| Search: ${meta.search_type}` : ""}
+          {meta.tool_log && meta.tool_log.length > 0 ? (
+            <div className="tool-log">
+              {meta.tool_log.map((line, idx) => (
+                <div key={idx}>{line}</div>
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
       {role === "assistant" && onFeedback && (
@@ -25,9 +36,11 @@ function MessageBubble({ role, text, meta, onFeedback }) {
 function App() {
   const [prompts, setPrompts] = useState([]);
   const [promptId, setPromptId] = useState("");
+  const [language, setLanguage] = useState("english");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [controller, setController] = useState(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/prompts`)
@@ -58,11 +71,22 @@ function App() {
     setLoading(true);
     setInput("");
 
+    if (controller) {
+      controller.abort();
+    }
+    const ctrl = new AbortController();
+    setController(ctrl);
+
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg.text, prompt_id: promptId || null }),
+        body: JSON.stringify({
+          message: userMsg.text,
+          prompt_id: promptId || null,
+          language: language || null,
+        }),
+        signal: ctrl.signal,
       });
       const data = await res.json();
       if (res.ok) {
@@ -81,14 +105,30 @@ function App() {
         setMessages((prev) => [...prev, assistantMsg]);
       }
     } catch (err) {
-      const assistantMsg = {
-        role: "assistant",
-        text: "Network error",
-        meta: { prompt_id: promptId },
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      if (err.name === "AbortError") {
+        const assistantMsg = {
+          role: "assistant",
+          text: "_Request cancelled_",
+          meta: { prompt_id: promptId },
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        const assistantMsg = {
+          role: "assistant",
+          text: "Network error",
+          meta: { prompt_id: promptId },
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      }
     } finally {
       setLoading(false);
+      setController(null);
+    }
+  };
+
+  const stopRequest = () => {
+    if (controller) {
+      controller.abort();
     }
   };
 
@@ -117,12 +157,26 @@ function App() {
     <div className="app">
       <div className="card">
         <div className="header">
-          <div className="title">RAG Web UI</div>
-          <div className="prompt-select">
-            <span className="small">Prompt</span>
-            <select value={promptId} onChange={(e) => setPromptId(e.target.value)}>
-              {promptOptions}
-            </select>
+          <div className="title">
+            RAG Web UI
+            <div className="subtitle">Postgres + pgvector + prompt evals</div>
+          </div>
+          <div className="controls">
+            <div className="control">
+              <span className="small">Prompt</span>
+              <select value={promptId} onChange={(e) => setPromptId(e.target.value)}>
+                {promptOptions}
+              </select>
+            </div>
+            <div className="control">
+              <span className="small">Language</span>
+              <input
+                type="text"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                placeholder="e.g., dutch"
+              />
+            </div>
           </div>
         </div>
 
@@ -158,6 +212,9 @@ function App() {
           />
           <button onClick={sendMessage} disabled={loading}>
             {loading ? "..." : "Send"}
+          </button>
+          <button onClick={stopRequest} disabled={!loading}>
+            Stop
           </button>
         </div>
       </div>

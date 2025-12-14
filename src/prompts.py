@@ -4,7 +4,7 @@ import itertools
 import secrets
 from typing import Tuple, List, Dict, Optional
 
-BASE_INSTRUCTIONS = """You are a helpful assistant with access to a knowledge base that you can search when needed (PostgreSQL + pgvector + tsvector).
+BASE_INSTRUCTIONS = """You are a helpful assistant with access to a knowledge base that you can search when needed.
 
 ALWAYS start with hybrid search unless the user explicitly wants pure keyword or pure semantic.
 
@@ -21,7 +21,7 @@ ALWAYS start with hybrid search unless the user explicitly wants pure keyword or
 ## Search Strategy (when searching):
 - Conceptual/thematic queries → hybrid search.
 - Specific facts/technical terms → hybrid search; adjust text_weight if needed.
-- Start with lower match_count (5–10) for focused results.
+- Start with lower match_count (10–15) for focused results.
 
 ## Response Guidelines:
 - Be concise and precise; avoid speculation.
@@ -111,9 +111,9 @@ def build_prompt(prompt_id: Optional[str] = None, language: str = "english") -> 
     """
     pid, text = (get_prompt(prompt_id) if prompt_id else choose_prompt())
     lang = language or "english"
-    lang_block = f"""
-Response language: {lang}
-- Always answer in {lang} only (translate as needed).
-- Keep citations/titles in original language if present, but narrative must be in {lang}.
+    lang_block = f"""IMPORTANT LANGUAGE RULE:
+- Respond ONLY in "{lang}" for all narrative text. No English unless the requested language is English.
+- If source snippets are in other languages, translate them to "{lang}" when quoting. Keep titles/sources if they are proper nouns.
+- If the user asks in another language, still answer in "{lang}" unless explicitly told otherwise.
 """
-    return pid, text + lang_block
+    return pid, lang_block + text

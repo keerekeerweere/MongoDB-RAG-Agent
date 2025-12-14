@@ -33,12 +33,14 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     prompt_id: Optional[str] = None
+    language: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     answer: str
     prompt_id: str
     search_type: Optional[str] = None
+    tool_log: Optional[list[str]] = None
 
 
 class FeedbackRequest(BaseModel):
@@ -65,7 +67,7 @@ async def chat(req: ChatRequest):
     try:
         prompt_id, prompt_text = build_prompt(
             prompt_id=req.prompt_id,
-            language=settings.text_search_language,
+            language=req.language or settings.text_search_language,
         )
 
         state = RAGState(last_prompt_id=prompt_id)
@@ -79,11 +81,13 @@ async def chat(req: ChatRequest):
 
         # search_type may be set by the tool
         search_type = getattr(deps.state, "last_search_type", None)
+        tool_log = getattr(deps.state, "last_tool_log", None)
 
         return ChatResponse(
             answer=str(result.output),
             prompt_id=prompt_id,
             search_type=search_type,
+            tool_log=tool_log,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

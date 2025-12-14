@@ -2,7 +2,7 @@
 
 from pydantic_ai import Agent, RunContext
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 from pydantic_ai.ag_ui import StateDeps
 
@@ -16,6 +16,7 @@ class RAGState(BaseModel):
 
     last_prompt_id: Optional[str] = None
     last_search_type: Optional[str] = None
+    last_tool_log: List[str] = []
 
 
 # Create the RAG agent with AGUI support (system prompt set per run)
@@ -29,7 +30,7 @@ rag_agent = Agent(
 async def search_knowledge_base(
     ctx: RunContext[StateDeps[RAGState]],
     query: str,
-    match_count: Optional[int] = 5,
+    match_count: Optional[int] = 10,
     search_type: Optional[str] = "hybrid"
 ) -> str:
     """
@@ -48,6 +49,11 @@ async def search_knowledge_base(
         deps_ctx = DepsWrapper(agent_deps)
 
         # Perform the search based on type
+        if hasattr(ctx, "deps") and hasattr(ctx.deps, "state"):
+            ctx.deps.state.last_tool_log = [
+                f"search_knowledge_base search_type={search_type} match_count={match_count}"
+            ]
+
         if search_type == "hybrid":
             results = await hybrid_search(
                 ctx=deps_ctx,
@@ -70,6 +76,11 @@ async def search_knowledge_base(
         # Record last search type for feedback logging
         if hasattr(ctx, "deps") and hasattr(ctx.deps, "state"):
             ctx.deps.state.last_search_type = search_type
+            if not ctx.deps.state.last_tool_log:
+                ctx.deps.state.last_tool_log = []
+            ctx.deps.state.last_tool_log.append(
+                f"results returned={len(results)}"
+            )
 
         # Clean up
         await agent_deps.cleanup()

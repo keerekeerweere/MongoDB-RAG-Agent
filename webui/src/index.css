@@ -31,7 +31,8 @@ a {
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
@@ -40,10 +41,22 @@ a {
   font-weight: 700;
 }
 
-.prompt-select {
+.subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.controls {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.control {
+  display: flex;
+  gap: 6px;
+  flex-direction: column;
 }
 
 select {
@@ -77,6 +90,42 @@ select {
 .bubble.assistant {
   background: #0b1220;
   align-self: flex-start;
+}
+
+.message-body {
+  line-height: 1.55;
+}
+
+.message-body h1,
+.message-body h2,
+.message-body h3 {
+  margin: 8px 0 6px;
+}
+
+.message-body p {
+  margin: 6px 0;
+}
+
+.message-body ul,
+.message-body ol {
+  margin: 6px 0 6px 18px;
+  padding-left: 12px;
+}
+
+.message-body code {
+  background: #0f172a;
+  padding: 2px 4px;
+  border-radius: 6px;
+  font-family: "JetBrains Mono", monospace;
+  color: #fbbf24;
+}
+
+.message-body pre {
+  background: #0f172a;
+  padding: 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid #1f2937;
 }
 
 .input-row {
