@@ -30,6 +30,7 @@ MODEL_CONFIGS = {
     "text-embedding-3-small": {"dimensions": 1536, "max_tokens": 8191},
     "text-embedding-3-large": {"dimensions": 3072, "max_tokens": 8191},
     "text-embedding-ada-002": {"dimensions": 1536, "max_tokens": 8191},
+    "gpt-oss-20l:120b": {"dimensions": 1536, "max_tokens": 8191},
     "qwen3-embedding": {"dimensions": 1536, "max_tokens": 8191},
     "mxbai-embed-large": {"dimensions": 1024, "max_tokens": 8191},
 }

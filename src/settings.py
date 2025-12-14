@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # Search Configuration
     default_match_count: int = Field(
-        default=10, description="Default number of search results to return"
+        default=15, description="Default number of search results to return"
     )
 
     max_match_count: int = Field(
@@ -71,6 +71,10 @@ class Settings(BaseSettings):
 
     default_text_weight: float = Field(
         default=0.3, description="Default text weight for hybrid search (0-1)"
+    )
+
+    text_search_language: str = Field(
+        default="english", description="Postgres text search language (e.g., english, dutch)"
     )
 
 

@@ -82,6 +82,7 @@ Edit `.env` with your credentials:
 - **LLM_API_KEY**: Your LLM provider API key (OpenRouter, OpenAI, etc.)
 - **EMBEDDING_API_KEY**: Your API key for embeddings (such as OpenAI or OpenRouter)
 - **EMBEDDING_MODEL / EMBEDDING_DIMENSION**: Ensure the dimension matches your pgvector column (default 1536)
+- **TEXT_SEARCH_LANGUAGE**: Language for PostgreSQL text search (e.g., `english`, `dutch`)
 
 ### 5. Validate Configuration
 

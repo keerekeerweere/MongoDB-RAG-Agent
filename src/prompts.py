@@ -1,4 +1,4 @@
-"""System prompts for MongoDB RAG Agent."""
+"""System prompts for Postgresql RAG Agent."""
 
 MAIN_SYSTEM_PROMPT = """You are a helpful assistant with access to a knowledge base that you can search when needed.
 
